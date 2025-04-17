@@ -15,17 +15,8 @@ inline constexpr T up_div(T a, T b) { return (a + b - 1) / b; }
 template<typename T>
 inline constexpr T round_up(T a, T b) { return up_div(a, b) * b; }
 
-inline constexpr unsigned round_up_pow2(unsigned x) {
-    int log = 0;
-    x--;
-    while (x) {
-        x /= 2;
-        log++;
-    }
-    return 1U << log;
-}
-
-inline constexpr unsigned round_down_pow2(unsigned x) {
+template<typename T>
+inline constexpr T round_down_pow2(T x) {
     return round_up_pow2(x + 1) / 2;
 }
 
@@ -355,7 +346,7 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_cuda_kernel(T *
                 }
             } else {
                 // The number of threads to calculate the sum of each group (should be a power of 2 for warp reduce)
-                constexpr int THREADS_PER_GROUP = std::min(std::min(32U,
+                constexpr int THREADS_PER_GROUP = std::min(std::min(32,
                                                                     round_up_pow2(ROWS_PER_IO)),
                                                                     round_up_pow2(BLOCK_DIM_X / MAX_NUM_GROUPS_PER_BLOCK / 2 + 1));
                 static_assert(BLOCK_DIM_X >= MAX_NUM_GROUPS_PER_BLOCK * THREADS_PER_GROUP, "not enough threads");
@@ -403,7 +394,7 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_cuda_kernel(T *
             __shared__ float2 mean_var[MAX_NUM_GROUPS_PER_BLOCK];
             if constexpr (!STORE_MEAN_VAR_IN_SHARED_RED_BUFFER) {
                 // The number of threads to calculate the sum of each group (should be a power of 2 for warp reduce)
-                constexpr int THREADS_PER_GROUP = std::min(std::min(32U,
+                constexpr int THREADS_PER_GROUP = std::min(std::min(32,
                                                                     round_up_pow2(virtual_cluster_dim_y)),
                                                                     round_up_pow2(BLOCK_DIM_X / MAX_NUM_GROUPS_PER_BLOCK / 2 + 1));
                 static_assert(BLOCK_DIM_X >= MAX_NUM_GROUPS_PER_BLOCK * THREADS_PER_GROUP, "not enough threads");
@@ -770,7 +761,7 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel
 
             if ((CONSTANT_C_LOOP && nc_scheduler.at_end(n)) || !CONSTANT_C_LOOP) {
                 constexpr int NT_C = max_divisor(C_PER_BLOCK, BLOCK_DIM_X);  // Number of threads on the C axis
-                constexpr int NT_R = 1;  // std::min(32, (int)round_down_pow2(BLOCK_DIM_X / NT_C));  // Number of threads on the ROWS axis
+                constexpr int NT_R = 1;  // std::min(32, round_down_pow2(BLOCK_DIM_X / NT_C));  // Number of threads on the ROWS axis
                 // TODO: swizzle for NT_R
                 for (int i = 0; i < VEC_ELEMS; i++) {
                     union_smem.dwdb_block_buffer[threadIdx.x][i ^ ((threadIdx.x / (16 / VEC_ELEMS)) & (VEC_ELEMS - 1))] = float2{dw_thread[i], db_thread[i]};
@@ -838,7 +829,7 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel
                 }
             } else {
                 // The number of threads to calculate the sum of each group (should be a power of 2 for warp reduce)
-                constexpr int THREADS_PER_GROUP = std::min(std::min(32U,
+                constexpr int THREADS_PER_GROUP = std::min(std::min(32,
                                                                     round_up_pow2(ROWS_PER_IO)),
                                                                     round_up_pow2(BLOCK_DIM_X / MAX_NUM_GROUPS_PER_BLOCK / 2 + 1));
                 static_assert(BLOCK_DIM_X >= MAX_NUM_GROUPS_PER_BLOCK * THREADS_PER_GROUP, "not enough threads");
@@ -909,7 +900,7 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel
             __shared__ float2 mean_var[MAX_NUM_GROUPS_PER_BLOCK];
             if constexpr (!STORE_MEAN_VAR_IN_SHARED_RED_BUFFER) {
                 // The number of threads to calculate the sum of each group (should be a power of 2 for warp reduce)
-                constexpr int THREADS_PER_GROUP = std::min(std::min(32U,
+                constexpr int THREADS_PER_GROUP = std::min(std::min(32,
                                                                     round_up_pow2(virtual_cluster_dim_y)),
                                                                     round_up_pow2(BLOCK_DIM_X / MAX_NUM_GROUPS_PER_BLOCK / 2 + 1));
                 static_assert(BLOCK_DIM_X >= MAX_NUM_GROUPS_PER_BLOCK * THREADS_PER_GROUP, "not enough threads");

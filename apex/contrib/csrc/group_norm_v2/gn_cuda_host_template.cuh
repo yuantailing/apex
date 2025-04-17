@@ -7,6 +7,7 @@
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
 
+#include "gn.hpp"
 #include "gn_utils.hpp"
 #include "gn_cuda_kernel.cuh"
 
@@ -87,7 +88,7 @@ constexpr auto compute_gn_params() {
 
         C_PER_BLOCK = c_per_cluster;
         BLOCK_DIM_X = C_PER_BLOCK == 320 ? 320 : 480;
-\
+
         // Maximum number of rows that should reside in registers
         int register_max_rows = 36000 * 4 / (C_PER_BLOCK * (1 + BWD) * sizeof(T));
 
