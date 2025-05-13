@@ -70,7 +70,7 @@ constexpr auto compute_gn_params() {
         C_PER_BLOCK = CPG;
         ROWS_PER_BLOCK = HW;
         BLOCK_DIM_X = lcm(32, C_PER_BLOCK);
-        while (BLOCK_DIM_X < 256) {
+        while (BLOCK_DIM_X < 256 && ROWS_PER_BLOCK * C_PER_BLOCK % (BLOCK_DIM_X * 2) == 0) {
             BLOCK_DIM_X *= 2;
         }
         BLOCKS_PER_SM = 1;
@@ -78,7 +78,9 @@ constexpr auto compute_gn_params() {
         //   We have to leave some room for other variables and compiler optimizations,
         //   so we use 36000 as the threshold.
         LOAD_TWICE = BLOCKS_PER_SM * ROWS_PER_BLOCK * C_PER_BLOCK * (1 + BWD) * sizeof(T) > 36000 * 4;
-    } else {
+    }
+    // "BLOCK_DIM_X < 256" indicates that the block sync strategy does not output a satisfactory config
+    if (BLOCK_DIM_X < 256) {
         // Strategy 2: virtual cluster sync
         //   A virtual cluster is a group of blocks that are synchronized with each other.
         //   Each group, i.e., a multiple of (G * HW) elements, should be handled on the same virtual cluster.
@@ -87,7 +89,10 @@ constexpr auto compute_gn_params() {
         int c_per_cluster = lcm(128 / (int)sizeof(T), CPG);
 
         C_PER_BLOCK = c_per_cluster;
-        BLOCK_DIM_X = C_PER_BLOCK == 320 ? 320 : 480;
+        BLOCK_DIM_X = C_PER_BLOCK == 64 ? 512 :
+                      C_PER_BLOCK == 192 ? 384 :
+                      C_PER_BLOCK == 320 ? 320 :
+                      C_PER_BLOCK == 960 ? 480 : -1;
 
         // Maximum number of rows that should reside in registers
         int register_max_rows = 36000 * 4 / (C_PER_BLOCK * (1 + BWD) * sizeof(T));
@@ -96,10 +101,13 @@ constexpr auto compute_gn_params() {
         BLOCKS_PER_SM = 0;
         ROWS_PER_BLOCK = 0;
         for (int blocks_per_sm = 1; blocks_per_sm <= 3; blocks_per_sm++) {
-            for (int rows_per_block = HW; rows_per_block >= 1; rows_per_block /= 2) {
+            for (int rows_per_block = HW, remainder = 0; remainder == 0; remainder = rows_per_block % 2, rows_per_block /= 2) {
                 int virtual_cluster_size = (HW / rows_per_block) * (c_per_cluster / C_PER_BLOCK);
                 if (virtual_cluster_size > blocks_per_sm * (LB_SM_COUNT - SM_MARGIN)) {
-                    continue;
+                    break;
+                }
+                if (rows_per_block * C_PER_BLOCK % BLOCK_DIM_X != 0) {
+                    break;
                 }
                 int num_clusters = blocks_per_sm * (LB_SM_COUNT - SM_MARGIN) / virtual_cluster_size;
                 int num_tasks = LB_N * (C / c_per_cluster);
