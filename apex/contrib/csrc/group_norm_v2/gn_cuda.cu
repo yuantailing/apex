@@ -15,6 +15,7 @@
 #define DISPATCH_NUM_GROUPS_AND_SILU(num_groups, silu, NUM_GROUPS, SILU, ...) [&] { \
     if (num_groups == 16 && silu == true) { constexpr int NUM_GROUPS = 16; constexpr bool SILU = true; return __VA_ARGS__(); } \
     if (num_groups == 32 && silu == false) { constexpr int NUM_GROUPS = 32; constexpr bool SILU = false; return __VA_ARGS__(); } \
+    if (num_groups == 32 && silu == true) { constexpr int NUM_GROUPS = 32; constexpr bool SILU = true; return __VA_ARGS__(); } \
     throw std::invalid_argument("DISPATCH_NUM_GROUPS_AND_SILU " + std::to_string(num_groups) + " " + std::to_string(silu)); \
     }()
 

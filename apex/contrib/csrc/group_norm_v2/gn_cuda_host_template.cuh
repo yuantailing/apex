@@ -463,11 +463,15 @@ void gn_bwd_cuda_single_shape(GN_BWD_CUDA_HOST_PARAMS(T)) {
 #define GN_CUDA_INST_DEFINE(HW, C) \
     template void gn_cuda_single_shape<half, HW, C, 16, true>(GN_CUDA_HOST_PARAMS(half)); \
     template void gn_cuda_single_shape<half, HW, C, 32, false>(GN_CUDA_HOST_PARAMS(half)); \
+    template void gn_cuda_single_shape<half, HW, C, 32, true>(GN_CUDA_HOST_PARAMS(half)); \
     template void gn_bwd_cuda_single_shape<half, HW, C, 16, true>(GN_BWD_CUDA_HOST_PARAMS(half)); \
     template void gn_bwd_cuda_single_shape<half, HW, C, 32, false>(GN_BWD_CUDA_HOST_PARAMS(half)); \
+    template void gn_bwd_cuda_single_shape<half, HW, C, 32, true>(GN_BWD_CUDA_HOST_PARAMS(half)); \
     template void gn_cuda_single_shape<__nv_bfloat16, HW, C, 16, true>(GN_CUDA_HOST_PARAMS(__nv_bfloat16)); \
     template void gn_cuda_single_shape<__nv_bfloat16, HW, C, 32, false>(GN_CUDA_HOST_PARAMS(__nv_bfloat16)); \
+    template void gn_cuda_single_shape<__nv_bfloat16, HW, C, 32, true>(GN_CUDA_HOST_PARAMS(__nv_bfloat16)); \
     template void gn_bwd_cuda_single_shape<__nv_bfloat16, HW, C, 16, true>(GN_BWD_CUDA_HOST_PARAMS(__nv_bfloat16)); \
-    template void gn_bwd_cuda_single_shape<__nv_bfloat16, HW, C, 32, false>(GN_BWD_CUDA_HOST_PARAMS(__nv_bfloat16));
+    template void gn_bwd_cuda_single_shape<__nv_bfloat16, HW, C, 32, false>(GN_BWD_CUDA_HOST_PARAMS(__nv_bfloat16)); \
+    template void gn_bwd_cuda_single_shape<__nv_bfloat16, HW, C, 32, true>(GN_BWD_CUDA_HOST_PARAMS(__nv_bfloat16));
 
 }  // namespace group_norm_v2

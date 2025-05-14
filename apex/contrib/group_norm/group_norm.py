@@ -321,6 +321,7 @@ class GroupNorm(torch.nn.Module):
         # (num_groups, with_swish)
         (16, True),
         (32, False),
+        (32, True),
         ])
     GN_V2_SUPPORTED_LOWER_BOUND_SM_COUNT = {
         (10, 0): 148,
