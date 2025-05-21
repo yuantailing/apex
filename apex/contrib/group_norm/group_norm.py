@@ -315,7 +315,9 @@ class GroupNorm(torch.nn.Module):
     GN_V2_SUPPORTED_DTYPES = frozenset([
         # (input dtype, parameter dtype)
         (torch.float16, torch.float16),
+        (torch.float16, torch.float32),
         (torch.bfloat16, torch.bfloat16),
+        (torch.bfloat16, torch.float32),
         ])
     GN_V2_SUPPORTED_GROUPS_SWISH = frozenset([
         # (num_groups, with_swish)

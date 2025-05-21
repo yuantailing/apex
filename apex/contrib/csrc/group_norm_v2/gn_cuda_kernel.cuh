@@ -172,7 +172,7 @@ public:
 };
 
 template<typename T, int BLOCK_DIM_X, int BLOCKS_PER_SM, int G, int CPG, int HW, bool SILU, int ROWS_PER_BLOCK, int C_PER_BLOCK, int C_PER_CLUSTER, int VEC_ELEMS, bool PERSISTENT, int NUM_VIRTUAL_CLUSTERS, bool LOAD_TWICE, bool HARDWARE_CLUSTER, class CompileCondition = CompileConditionAlwaysTrue>
-__global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_cuda_kernel(T *__restrict__ out, T const *__restrict__ x, T const *__restrict__ w, T const *__restrict__ b, float eps, int64_t n, float *__restrict__ mean_var_out, float *__restrict__ red_buffer, unsigned *__restrict__ barrier) {
+__global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_cuda_kernel(T *__restrict__ out, T const *__restrict__ x, void const *__restrict__ w, void const *__restrict__ b, float eps, int64_t n, float *__restrict__ mean_var_out, bool w32, float *__restrict__ red_buffer, unsigned *__restrict__ barrier) {
     // Procedure Overview
     //   1. Thread sum: read from gmem, write partial sum to smem, store input in registers (if no LOAD_TWICE)
     //   2. Block sum: read from smem, write partial sum to gmem (or distributed shared memory if HARDWARE_CLUSTER is used)
@@ -303,8 +303,24 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_cuda_kernel(T *
                 __syncthreads();
             }
 
-            U uw = *reinterpret_cast<U const *>(&w[thread_channel_start]);
-            U ub = *reinterpret_cast<U const *>(&b[thread_channel_start]);
+            struct alignas(VEC_ELEMS * sizeof(float)) U_WEIGHT {
+                float data[VEC_ELEMS];
+            };
+            U_WEIGHT uw;
+            U_WEIGHT ub;
+            if (w32) {
+                uw = *reinterpret_cast<U_WEIGHT const *>((float *)w + thread_channel_start);
+                ub = *reinterpret_cast<U_WEIGHT const *>((float *)b + thread_channel_start);
+            } else {
+                U uw_T = *reinterpret_cast<U const *>((T *)w + thread_channel_start);
+                U ub_T = *reinterpret_cast<U const *>((T *)b + thread_channel_start);
+                for (int i = 0; i < VEC_ELEMS; i++) {
+                    uw.data[i] = uw_T.data[i];
+                }
+                for (int i = 0; i < VEC_ELEMS; i++) {
+                    ub.data[i] = ub_T.data[i];
+                }
+            }
 
             // Three cases for the red_buffer:
             //   - Block sync (VIRTUAL_CLUSTER_SIZE=1): use shared memory
@@ -541,7 +557,7 @@ enum WgradSyncMethod {
 };
 
 template<typename T, int BLOCK_DIM_X, int BLOCKS_PER_SM, int G, int CPG, int HW, bool SILU, bool REQUIRES_WGRAD, int ROWS_PER_BLOCK, int C_PER_BLOCK, int C_PER_CLUSTER, int VEC_ELEMS, bool PERSISTENT, int NUM_VIRTUAL_CLUSTERS, bool LOAD_TWICE, bool HARDWARE_CLUSTER, WgradSyncMethod wgrad_sync_method, class CompileCondition = CompileConditionAlwaysTrue>
-__global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel(T *__restrict__ grad_input, T *__restrict__ grad_weight, T *__restrict__ grad_bias, T const *__restrict__ grad_output, T const *__restrict__ x, T const *__restrict__ w, T const *__restrict__ b, float const *__restrict__ mean_var, float eps, int64_t n, float *__restrict__ red_buffer, unsigned *__restrict__ barrier) {
+__global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel(T *__restrict__ grad_input, void *__restrict__ grad_weight, void *__restrict__ grad_bias, T const *__restrict__ grad_output, T const *__restrict__ x, void const *__restrict__ w, void const *__restrict__ b, float const *__restrict__ mean_var, float eps, int64_t n, bool w32, float *__restrict__ red_buffer, unsigned *__restrict__ barrier) {
     // Procedure Overview
     //   1. Thread sum: read from gmem, write partial sum to smem, store input in registers (if no LOAD_TWICE)
     //   2. Block sum: read from smem, write partial sum to gmem (or distributed shared memory if HARDWARE_CLUSTER is used),
@@ -658,10 +674,27 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel
                 frag_var[k / GCD_VEC_CPG] = value.y;
             }
 
-            U uw = *reinterpret_cast<U const *>(&w[thread_channel_start]);
-            U ub;
-            if constexpr (SILU) {
-                ub = *reinterpret_cast<U const *>(&b[thread_channel_start]);
+            struct alignas(VEC_ELEMS * sizeof(float)) U_WEIGHT {
+                float data[VEC_ELEMS];
+            };
+            U_WEIGHT uw;
+            U_WEIGHT ub;
+            if (w32) {
+                uw = *reinterpret_cast<U_WEIGHT const *>((float *)w + thread_channel_start);
+                if constexpr (SILU) {
+                    ub = *reinterpret_cast<U_WEIGHT const *>((float *)b + thread_channel_start);
+                }
+            } else {
+                U uw_T = *reinterpret_cast<U const *>((T *)w + thread_channel_start);
+                for (int i = 0; i < VEC_ELEMS; i++) {
+                    uw.data[i] = uw_T.data[i];
+                }
+                if constexpr (SILU) {
+                    U ub_T = *reinterpret_cast<U const *>((T *)b + thread_channel_start);
+                    for (int i = 0; i < VEC_ELEMS; i++) {
+                        ub.data[i] = ub_T.data[i];
+                    }
+                }
             }
             if constexpr (REQUIRES_WGRAD && !CONSTANT_C_LOOP) {
                 for (int i = 0; i < VEC_ELEMS; i++) {
@@ -1087,8 +1120,13 @@ __global__ __launch_bounds__(BLOCK_DIM_X, BLOCKS_PER_SM) void gn_bwd_cuda_kernel
                         sum_bgrad += __shfl_xor_sync((uint64_t(1) << warp_num_pow2) - 1, sum_bgrad, mask, warp_num_pow2);
                     }
                     if (j == 0) {
-                        grad_weight[c + i] = sum_wgrad;
-                        grad_bias[c + i] = sum_bgrad;
+                        if (w32) {
+                            static_cast<float *>(grad_weight)[c + i] = sum_wgrad;
+                            static_cast<float *>(grad_bias)[c + i] = sum_bgrad;
+                        } else {
+                            static_cast<T *>(grad_weight)[c + i] = sum_wgrad;
+                            static_cast<T *>(grad_bias)[c + i] = sum_bgrad;
+                        }
                     }
                 }
                 __syncthreads();

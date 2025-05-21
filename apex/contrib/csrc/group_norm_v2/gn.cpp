@@ -32,30 +32,30 @@ torch::Tensor gn(torch::Tensor x, torch::Tensor w, torch::Tensor b, float eps, b
     cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
     int device_id = at::cuda::getCurrentCUDAStream().device().index();
     group_norm_v2::Meta meta;
-    if (x.dtype() == torch::kHalf && w.dtype() == torch::kHalf) {
+    if (x.dtype() == torch::kHalf && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_cuda(
-            (half *)out.data_ptr(), (half *)x.data_ptr(), (half *)w.data_ptr(), (half *)b.data_ptr(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out,
+            (half *)out.data_ptr(), (half *)x.data_ptr(), w.data_ptr(), b.data_ptr(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out, w.dtype() == torch::kFloat32,
             nullptr, nullptr, sm_margin, stream, device_id, &meta, true);
-    } else if (x.dtype() == torch::kBFloat16 && w.dtype() == torch::kBFloat16) {
+    } else if (x.dtype() == torch::kBFloat16 && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_cuda(
-            (__nv_bfloat16 *)out.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), (__nv_bfloat16 *)w.data_ptr(), (__nv_bfloat16 *)b.data_ptr(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out,
+            (__nv_bfloat16 *)out.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), w.data_ptr(), b.data_ptr(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out, w.dtype() == torch::kFloat32,
             nullptr, nullptr, sm_margin, stream, device_id, &meta, true);
     } else {
         throw std::invalid_argument("gn only supports half or bfloat16 input and weight");
     }
     torch::Tensor red_buffer = torch::empty({meta.red_buffer_size}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA));
     unsigned *barrier = get_persistent_barrier(stream, meta.barrier_size);
-    if (x.dtype() == torch::kHalf && w.dtype() == torch::kHalf) {
+    if (x.dtype() == torch::kHalf && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_cuda(
-            (half *)out.data_ptr(), (half *)x.data_ptr(), (half *)w.data_ptr(), (half *)b.data_ptr(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out,
+            (half *)out.data_ptr(), (half *)x.data_ptr(), w.data_ptr(), b.data_ptr(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out, w.dtype() == torch::kFloat32,
             red_buffer.data_ptr<float>(), barrier, sm_margin, stream, device_id, nullptr, false);
-    } else if (x.dtype() == torch::kBFloat16 && w.dtype() == torch::kBFloat16) {
+    } else if (x.dtype() == torch::kBFloat16 && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_cuda(
-            (__nv_bfloat16 *)out.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), (__nv_bfloat16 *)w.data_ptr(), (__nv_bfloat16 *)b.data_ptr(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out,
+            (__nv_bfloat16 *)out.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), w.data_ptr(), b.data_ptr(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, ptr_mean_var_out, w.dtype() == torch::kFloat32,
             red_buffer.data_ptr<float>(), barrier, sm_margin, stream, device_id, nullptr, false);
     } else {
         throw std::invalid_argument("gn only supports half or bfloat16 input and weight");
@@ -73,34 +73,34 @@ auto gn_bwd(torch::Tensor grad_output, torch::Tensor x, torch::Tensor w, torch::
     cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
     int device_id = at::cuda::getCurrentCUDAStream().device().index();
     group_norm_v2::Meta meta;
-    if (x.dtype() == torch::kHalf && w.dtype() == torch::kHalf) {
+    if (x.dtype() == torch::kHalf && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_bwd_cuda(
-            (half *)grad_input.data_ptr(), (half *)grad_weight.data_ptr(), (half *)grad_bias.data_ptr(),
-            (half *)grad_output.data_ptr(), (half *)x.data_ptr(), (half *)w.data_ptr(), (half *)b.data_ptr(), mean_var.data_ptr<float>(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups,
+            (half *)grad_input.data_ptr(), grad_weight.data_ptr(), grad_bias.data_ptr(),
+            (half *)grad_output.data_ptr(), (half *)x.data_ptr(), w.data_ptr(), b.data_ptr(), mean_var.data_ptr<float>(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, w.dtype() == torch::kFloat32,
             nullptr, nullptr, sm_margin, stream, device_id, &meta, true);
-    } else if (x.dtype() == torch::kBFloat16 && w.dtype() == torch::kBFloat16) {
+    } else if (x.dtype() == torch::kBFloat16 && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_bwd_cuda(
             (__nv_bfloat16 *)grad_input.data_ptr(), (__nv_bfloat16 *)grad_weight.data_ptr(), (__nv_bfloat16 *)grad_bias.data_ptr(),
             (__nv_bfloat16 *)grad_output.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), (__nv_bfloat16 *)w.data_ptr(), (__nv_bfloat16 *)b.data_ptr(), mean_var.data_ptr<float>(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups,
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, w.dtype() == torch::kFloat32,
             nullptr, nullptr, sm_margin, stream, device_id, &meta, true);
     } else {
         throw std::invalid_argument("gn only supports half or bfloat16 input and weight");
     }
     torch::Tensor red_buffer = torch::empty({meta.red_buffer_size}, torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA));
     unsigned *barrier = get_persistent_barrier(stream, meta.barrier_size);
-    if (x.dtype() == torch::kHalf && w.dtype() == torch::kHalf) {
+    if (x.dtype() == torch::kHalf && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_bwd_cuda(
-            (half *)grad_input.data_ptr(), (half *)grad_weight.data_ptr(), (half *)grad_bias.data_ptr(),
-            (half *)grad_output.data_ptr(), (half *)x.data_ptr(), (half *)w.data_ptr(), (half *)b.data_ptr(), mean_var.data_ptr<float>(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups,
+            (half *)grad_input.data_ptr(), grad_weight.data_ptr(), grad_bias.data_ptr(),
+            (half *)grad_output.data_ptr(), (half *)x.data_ptr(), w.data_ptr(), b.data_ptr(), mean_var.data_ptr<float>(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, w.dtype() == torch::kFloat32,
             red_buffer.data_ptr<float>(), barrier, sm_margin, stream, device_id, nullptr, false);
-    } else if (x.dtype() == torch::kBFloat16 && w.dtype() == torch::kBFloat16) {
+    } else if (x.dtype() == torch::kBFloat16 && (w.dtype() == x.dtype() || w.dtype() == torch::kFloat32)) {
         group_norm_v2::gn_bwd_cuda(
-            (__nv_bfloat16 *)grad_input.data_ptr(), (__nv_bfloat16 *)grad_weight.data_ptr(), (__nv_bfloat16 *)grad_bias.data_ptr(),
-            (__nv_bfloat16 *)grad_output.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), (__nv_bfloat16 *)w.data_ptr(), (__nv_bfloat16 *)b.data_ptr(), mean_var.data_ptr<float>(),
-            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups,
+            (__nv_bfloat16 *)grad_input.data_ptr(), grad_weight.data_ptr(), grad_bias.data_ptr(),
+            (__nv_bfloat16 *)grad_output.data_ptr(), (__nv_bfloat16 *)x.data_ptr(), w.data_ptr(), b.data_ptr(), mean_var.data_ptr<float>(),
+            eps, silu, x.size(0), x.size(2) * x.size(3), num_groups, x.size(1) / num_groups, w.dtype() == torch::kFloat32,
             red_buffer.data_ptr<float>(), barrier, sm_margin, stream, device_id, nullptr, false);
     } else {
         throw std::invalid_argument("gn only supports half or bfloat16 input and weight");

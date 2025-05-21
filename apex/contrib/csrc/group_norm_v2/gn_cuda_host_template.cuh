@@ -312,7 +312,7 @@ void gn_cuda_single_shape(GN_CUDA_HOST_PARAMS(T)) {
                     kernel = &gn_cuda_kernel<T, BLOCK_DIM_X, BLOCKS_PER_SM, G, CPG, HW, SILU, ROWS_PER_BLOCK, C_PER_BLOCK, C_PER_CLUSTER, VEC_ELEMS, PERSISTENT_NEW, NUM_VIRTUAL_CLUSTERS, LOAD_TWICE, HARDWARE_CLUSTER_NEW, CompileCondition<EFFECTIVE_CUDA_ARCH> >;
                 }
             }
-            CUDA_CHECK(cudaLaunchKernelEx(&config, kernel, out, x, w, b, eps, n, mean_var_out, red_buffer, barrier));
+            CUDA_CHECK(cudaLaunchKernelEx(&config, kernel, out, x, w, b, eps, n, mean_var_out, w32, red_buffer, barrier));
         });
         });
     });
@@ -454,7 +454,7 @@ void gn_bwd_cuda_single_shape(GN_BWD_CUDA_HOST_PARAMS(T)) {
                     kernel = &gn_bwd_cuda_kernel<T, BLOCK_DIM_X, BLOCKS_PER_SM, G, CPG, HW, SILU, REQUIRES_WGRAD, ROWS_PER_BLOCK, C_PER_BLOCK, C_PER_CLUSTER, VEC_ELEMS, PERSISTENT, NUM_VIRTUAL_CLUSTERS, LOAD_TWICE, false, wgrad_sync_method, CompileCondition<EFFECTIVE_CUDA_ARCH> >;
                 }
             }
-            CUDA_CHECK(cudaLaunchKernelEx(&config, kernel, grad_input, grad_weight, grad_bias, grad_output, x, w, b, mean_var, eps, n, red_buffer, barrier));
+            CUDA_CHECK(cudaLaunchKernelEx(&config, kernel, grad_input, grad_weight, grad_bias, grad_output, x, w, b, mean_var, eps, n, w32, red_buffer, barrier));
         });
         });
     });

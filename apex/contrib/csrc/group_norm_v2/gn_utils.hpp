@@ -19,13 +19,13 @@ do {                                                                        \
 } while (0)
 
 
-#define GN_CUDA_HOST_PARAMS(T) T *out, T *x, T *w, T *b, float eps, bool silu, int64_t n, int64_t hw, int num_groups, int channels_per_group, float *mean_var_out, float *red_buffer, unsigned *barrier, int sm_margin, cudaStream_t stream, int device_id, group_norm_v2::Meta *meta_ptr, bool meta_only
+#define GN_CUDA_HOST_PARAMS(T) T *out, T *x, void *w, void *b, float eps, bool silu, int64_t n, int64_t hw, int num_groups, int channels_per_group, float *mean_var_out, bool w32, float *red_buffer, unsigned *barrier, int sm_margin, cudaStream_t stream, int device_id, group_norm_v2::Meta *meta_ptr, bool meta_only
 
-#define GN_BWD_CUDA_HOST_PARAMS(T) T *grad_input, T *grad_weight, T *grad_bias, T *grad_output, T *x, T *w, T *b, float *mean_var, float eps, bool silu, int64_t n, int64_t hw, int num_groups, int channels_per_group, float *red_buffer, unsigned *barrier, int sm_margin, cudaStream_t stream, int device_id, group_norm_v2::Meta *meta_ptr, bool meta_only
+#define GN_BWD_CUDA_HOST_PARAMS(T) T *grad_input, void *grad_weight, void *grad_bias, T *grad_output, T *x, void *w, void *b, float *mean_var, float eps, bool silu, int64_t n, int64_t hw, int num_groups, int channels_per_group, bool w32, float *red_buffer, unsigned *barrier, int sm_margin, cudaStream_t stream, int device_id, group_norm_v2::Meta *meta_ptr, bool meta_only
 
-#define GN_CUDA_HOST_ARGS out, x, w, b, eps, silu, n, hw, num_groups, channels_per_group, mean_var_out, red_buffer, barrier, sm_margin, stream, device_id, meta_ptr, meta_only
+#define GN_CUDA_HOST_ARGS out, x, w, b, eps, silu, n, hw, num_groups, channels_per_group, mean_var_out, w32, red_buffer, barrier, sm_margin, stream, device_id, meta_ptr, meta_only
 
-#define GN_BWD_CUDA_HOST_ARGS grad_input, grad_weight, grad_bias, grad_output, x, w, b, mean_var, eps, silu, n, hw, num_groups, channels_per_group, red_buffer, barrier, sm_margin, stream, device_id, meta_ptr, meta_only
+#define GN_BWD_CUDA_HOST_ARGS grad_input, grad_weight, grad_bias, grad_output, x, w, b, mean_var, eps, silu, n, hw, num_groups, channels_per_group, w32, red_buffer, barrier, sm_margin, stream, device_id, meta_ptr, meta_only
 
 
 namespace group_norm_v2 {
