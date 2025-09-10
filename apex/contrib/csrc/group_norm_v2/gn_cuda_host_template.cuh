@@ -24,6 +24,7 @@ namespace group_norm_v2 {
 
 #define DISPATCH_CUDA_ARCH_AND_LOWER_BOUND_SM_COUNT(runtime_cuda_arch, sm_count, RUNTIME_CUDA_ARCH, LB_SM_COUNT, ...) [&] { \
     if (runtime_cuda_arch == 1000 && sm_count >= 148) { constexpr int RUNTIME_CUDA_ARCH = 1000, LB_SM_COUNT = 148; return __VA_ARGS__(); } \
+    if (runtime_cuda_arch == 1030 && sm_count >= 148) { constexpr int RUNTIME_CUDA_ARCH = 1030, LB_SM_COUNT = 148; return __VA_ARGS__(); } \
     throw std::invalid_argument("DISPATCH_CUDA_ARCH_AND_LOWER_BOUND_SM_COUNT " + std::to_string(runtime_cuda_arch) + " " + std::to_string(sm_count)); \
     }()
 
@@ -45,7 +46,7 @@ inline constexpr int get_max_cuda_arch() {
     return max_cuda_arch;
 }
 
-template<typename T, bool BWD, bool REQUIRES_WGRAD, int HW, int G, int CPG, int LB_N, int RUNTIME_CUDA_ARCH, int LB_SM_COUNT, int EFFECTIVE_CUDA_ARCH, int SM_MARGIN>
+template<typename T, bool BWD, bool REQUIRES_WGRAD, int HW, int G, int CPG, int LB_N, int LB_SM_COUNT, int EFFECTIVE_CUDA_ARCH, int SM_MARGIN>
 constexpr auto compute_gn_params() {
     constexpr int C = G * CPG;
 
@@ -221,7 +222,7 @@ void gn_cuda_single_shape(GN_CUDA_HOST_PARAMS(T)) {
 
             constexpr int CPG = C / G;
 
-            constexpr auto params = compute_gn_params<T, false, false, HW, G, CPG, LB_N, RUNTIME_CUDA_ARCH, LB_SM_COUNT, EFFECTIVE_CUDA_ARCH, SM_MARGIN>();
+            constexpr auto params = compute_gn_params<T, false, false, HW, G, CPG, LB_N, LB_SM_COUNT, EFFECTIVE_CUDA_ARCH, SM_MARGIN>();
             constexpr int BLOCK_DIM_X =       std::get<0>(params);
             constexpr int C_PER_BLOCK =       std::get<1>(params);
             constexpr int ROWS_PER_BLOCK =    std::get<2>(params);
@@ -352,7 +353,7 @@ void gn_bwd_cuda_single_shape(GN_BWD_CUDA_HOST_PARAMS(T)) {
             constexpr bool REQUIRES_WGRAD = true;
             constexpr int CPG = C / G;
 
-            constexpr auto params = compute_gn_params<T, true, REQUIRES_WGRAD, HW, G, CPG, LB_N, RUNTIME_CUDA_ARCH, LB_SM_COUNT, EFFECTIVE_CUDA_ARCH, SM_MARGIN>();
+            constexpr auto params = compute_gn_params<T, true, REQUIRES_WGRAD, HW, G, CPG, LB_N, LB_SM_COUNT, EFFECTIVE_CUDA_ARCH, SM_MARGIN>();
             constexpr int BLOCK_DIM_X =       std::get<0>(params);
             constexpr int C_PER_BLOCK =       std::get<1>(params);
             constexpr int ROWS_PER_BLOCK =    std::get<2>(params);

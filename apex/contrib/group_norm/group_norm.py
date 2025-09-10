@@ -298,6 +298,7 @@ class GroupNorm(torch.nn.Module):
         ])
     GN_V2_SUPPORTED_LOWER_BOUND_SM_COUNT = {
         (10, 0): 148,
+        (10, 3): 148,
         }
 
     def __init__(self,
